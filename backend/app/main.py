@@ -54,7 +54,7 @@ def generate_resume(request: GenerateRequest):
             "additional_instructions": request.additional_instructions or "",
         }
     )
-    return result["generated_output"]
+    return result["improved_output"]
 
 @app.post("/parse-resume")
 async def parse_resume(file: UploadFile = File(...)):
