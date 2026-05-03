@@ -11,11 +11,23 @@ export const defaultMasterProfile: MasterProfile = {
   },
   profile_summary: [],
   experiences: [],
-  skills: {
-    tech_and_ai: [],
-    product: [],
-    data_and_analytics: [],
-  },
+  skills: [
+    {
+      id: crypto.randomUUID(),
+      name: "Skill Section 1",
+      skills: [],
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Skill Section 2",
+      skills: [],
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Skill Section 3",
+      skills: [],
+    },
+  ],
   education: [],
   projects: [],
   publications: [],

@@ -2,11 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.config import OPENAI_API_KEY, OPENAI_MODEL
-from app.schemas import (
-    MasterProfile,
-    JDExtractResponse,
-    GeneratedResumeOutput,
-)
+from app.schemas import MasterProfile, JDExtractResponse, GeneratedResumeOutput
 
 llm = ChatOpenAI(
     model=OPENAI_MODEL,
@@ -23,28 +19,34 @@ prompt = ChatPromptTemplate.from_messages(
             """
 You are an expert resume tailoring assistant.
 
-Your task is to rewrite and reorganize the user's resume content so it aligns better with the selected target role and job description.
+Your task:
+Rewrite and reorganize the user's resume content so it aligns with the selected target role and job description.
 
 STRICT RULES:
-- Do NOT invent achievements, metrics, tools, companies, titles, responsibilities, or projects.
-- Use only the information provided in the master profile.
+- Do NOT invent achievements, metrics, tools, companies, titles, responsibilities, skills, publications, or projects.
+- Use only information provided in the master profile.
 - You may rewrite, reorder, shorten, and prioritize content.
 - Keep bullets concise, professional, and resume-ready.
 - Preserve factual accuracy.
 - Keep the output close to the user's original resume style.
-- Skills can be reordered for relevance.
-- Education, publications, and languages should usually remain mostly unchanged.
+- Experience, education, projects, and publications may contain multiple entries.
+- Keep company names, school names, project names, publication titles, job titles, and dates accurate.
 - If a field such as location is missing, return an empty string.
-- Always return every required section.
+- Return every required section.
 
-Output sections required:
-- profile
-- experience
-- skills
-- education
-- projects
-- publications
-- languages
+SKILLS RULES:
+- The master profile may contain many skill sections.
+- Choose only the 3 most relevant skill sections for the target role and JD.
+- The input skill sections may be named "Skill Section 1", "Skill Section 2", etc.
+- Use the user's section names as hints, but improve the final section names to be resume-friendly and aligned to the JD.
+- Example: "Skill Section 1" may become "Tech Stack & AI" if the skills are technical.
+- Reorder skills inside each selected section based on relevance.
+- Do NOT add skills that are not present in the master profile.
+
+PUBLICATIONS RULES:
+- Publications may have title and details.
+- Preserve publication titles accurately.
+- Do not invent conference names, publication names, or publication details.
             """,
         ),
         (
@@ -75,7 +77,7 @@ def generate_resume_chain(
 ) -> GeneratedResumeOutput:
     chain = prompt | structured_llm
 
-    result = chain.invoke(
+    return chain.invoke(
         {
             "target_role": target_role,
             "additional_instructions": additional_instructions or "",
@@ -83,5 +85,3 @@ def generate_resume_chain(
             "master_profile": master_profile.model_dump_json(indent=2),
         }
     )
-
-    return result
