@@ -38,30 +38,35 @@ export type ProjectItem = {
   tags: string[];
 };
 
-export type SkillGroups = {
-  tech_and_ai: string[];
-  product: string[];
-  data_and_analytics: string[];
+export type SkillSection = {
+  id?: string;
+  name: string;
+  skills: string[];
+};
+
+export type PublicationItem = {
+  title: string;
+  details: string[];
 };
 
 export type MasterProfile = {
   basics: Basics;
   profile_summary: string[];
   experiences: ExperienceItem[];
-  skills: SkillGroups;
+  skills: SkillSection[];
   education: EducationItem[];
   projects: ProjectItem[];
-  publications: string[];
+  publications: PublicationItem[];
   languages: string[];
 };
 
 export type GeneratedResumeOutput = {
   profile: string[];
   experience: ExperienceItem[];
-  skills: SkillGroups;
+  skills: SkillSection[];
   education: EducationItem[];
   projects: ProjectItem[];
-  publications: string[];
+  publications: PublicationItem[];
   languages: string[];
 };
 

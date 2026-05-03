@@ -10,6 +10,10 @@ from app.schemas import (
 from app.chains.jd_extractor import extract_jd_chain
 from app.graphs.resume_graph import resume_graph
 
+from fastapi import UploadFile, File
+from app.utils.file_parser import extract_text
+from app.chains.resume_parser import parse_resume_chain
+
 app = FastAPI(title="Resume Tailor AI Backend")
 
 app.add_middleware(
@@ -51,3 +55,13 @@ def generate_resume(request: GenerateRequest):
         }
     )
     return result["generated_output"]
+
+@app.post("/parse-resume")
+async def parse_resume(file: UploadFile = File(...)):
+    content = await file.read()
+
+    text = extract_text(content, file.filename)
+
+    parsed = parse_resume_chain(text)
+
+    return parsed
