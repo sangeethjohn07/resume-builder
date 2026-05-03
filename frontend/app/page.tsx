@@ -11,10 +11,13 @@ import {
   PublicationItem,
   SkillSection,
   TargetRole,
+  GenerateResumeResponse,
+  ResumeEvaluation,
+  JDAnalysis,
 } from "@/lib/types";
 import { defaultMasterProfile } from "@/lib/defaultState";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const roleOptions: TargetRole[] = [
   "PM",
@@ -55,6 +58,9 @@ function createNewTab(index: number): ApplicationTab {
     jdText: "",
     additionalInstructions: "",
     output: null,
+    master_evaluation: null,
+    final_evaluation: null,
+    jdAnalysis: null,
   };
 }
 
@@ -140,6 +146,10 @@ function normalizePublications(publications: any): PublicationItem[] {
   return publications;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export default function Home() {
   const [masterProfile, setMasterProfile] =
     useState<MasterProfile>(defaultMasterProfile);
@@ -149,7 +159,7 @@ export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
     const savedMasterProfile = localStorage.getItem(
@@ -162,10 +172,8 @@ export default function Home() {
 
     if (savedMasterProfile) {
       const parsed = JSON.parse(savedMasterProfile);
-
       parsed.skills = normalizeSkills(parsed.skills);
       parsed.publications = normalizePublications(parsed.publications);
-
       setMasterProfile(parsed);
     }
 
@@ -180,6 +188,9 @@ export default function Home() {
                 publications: normalizePublications(tab.output.publications),
               }
             : null,
+          master_evaluation: tab.master_evaluation ?? null,
+          final_evaluation: tab.final_evaluation ?? null,
+          jdAnalysis: tab.jdAnalysis ?? null,
         })
       );
 
@@ -235,30 +246,14 @@ export default function Home() {
     setActiveTabId(newTab.id);
   }
 
-  function duplicateTab() {
-    const copy: ApplicationTab = {
-      ...activeTab,
-      id: crypto.randomUUID(),
-      title: `${activeTab.title} Copy`,
-    };
-
-    setTabs((prev) => [...prev, copy]);
-    setActiveTabId(copy.id);
-  }
-
-  function deleteActiveTab() {
-    if (tabs.length === 1) return;
-
-    const filtered = tabs.filter((tab) => tab.id !== activeTabId);
-    setTabs(filtered);
-    setActiveTabId(filtered[0].id);
-  }
-
   function clearActiveTab() {
     updateActiveTab({
       jdText: "",
       additionalInstructions: "",
       output: null,
+      master_evaluation: null,
+      final_evaluation: null,
+      jdAnalysis: null,
     });
   }
 
@@ -270,7 +265,7 @@ export default function Home() {
     formData.append("file", file);
 
     try {
-      setError("Parsing resume...");
+      setStatusMessage("Parsing resume...");
 
       const response = await fetch(`${API_URL}/parse-resume`, {
         method: "POST",
@@ -289,20 +284,22 @@ export default function Home() {
         publications: normalizePublications(data.publications),
       });
 
-      setError("Resume imported successfully ✅");
+      setStatusMessage("Resume imported successfully ✅");
       setIsDrawerOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse resume.");
+      setStatusMessage(
+        err instanceof Error ? err.message : "Failed to parse resume."
+      );
     } finally {
       e.target.value = "";
     }
   }
 
   async function generateResume() {
-    setError("");
+    setStatusMessage("");
 
     if (!activeTab.jdText.trim()) {
-      setError("Please paste a JD before generating.");
+      setStatusMessage("Please paste a JD before generating.");
       return;
     }
 
@@ -326,17 +323,24 @@ export default function Home() {
         throw new Error(`Backend error: ${response.status}`);
       }
 
-      const data: GeneratedResumeOutput = await response.json();
+      const data: GenerateResumeResponse = await response.json();
 
       updateActiveTab({
         output: {
-          ...data,
-          skills: normalizeSkills(data.skills),
-          publications: normalizePublications(data.publications),
+          ...data.output,
+          skills: normalizeSkills(data.output.skills),
+          publications: normalizePublications(data.output.publications),
         },
+        master_evaluation: data.master_evaluation,
+        final_evaluation: data.final_evaluation,
+        jdAnalysis: data.jd_analysis,
       });
+
+      setStatusMessage("Generated successfully ✅");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setStatusMessage(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -362,7 +366,9 @@ export default function Home() {
         "",
       ]),
       "SKILLS",
-      ...skills.map((section) => `${section.name}: ${section.skills.join(", ")}`),
+      ...skills.map(
+        (section) => `${section.name}: ${section.skills.join(", ")}`
+      ),
       "",
       "EDUCATION",
       ...output.education.flatMap((edu) => [
@@ -442,9 +448,15 @@ export default function Home() {
           </div>
 
           <div className="space-y-3">
-            <Summary label="Experience" count={masterProfile.experiences.length} />
+            <Summary
+              label="Experience"
+              count={masterProfile.experiences.length}
+            />
             <Summary label="Skills" count={masterProfile.skills.length} />
-            <Summary label="Education" count={masterProfile.education.length} />
+            <Summary
+              label="Education"
+              count={masterProfile.education.length}
+            />
             <Summary label="Projects" count={masterProfile.projects.length} />
             <Summary
               label="Publications"
@@ -456,8 +468,8 @@ export default function Home() {
           <div className="mt-5 rounded-2xl bg-violet-50 p-4 text-sm text-violet-900">
             <p className="font-semibold">Tip</p>
             <p className="mt-1 text-violet-800">
-              Import an existing resume from the editor, then clean the extracted
-              profile.
+              Import an existing resume from the editor, then clean the
+              extracted profile.
             </p>
           </div>
         </aside>
@@ -480,10 +492,6 @@ export default function Home() {
 
             <button onClick={addTab} className="btn-primary-small">
               + New Tab
-            </button>
-
-            <button onClick={duplicateTab} className="btn-secondary">
-              Duplicate
             </button>
           </div>
 
@@ -541,9 +549,9 @@ export default function Home() {
               }
             />
 
-            {error && (
+            {statusMessage && (
               <p className="mb-3 rounded-xl bg-slate-100 p-3 text-sm text-slate-700">
-                {error}
+                {statusMessage}
               </p>
             )}
 
@@ -553,22 +561,11 @@ export default function Home() {
                 disabled={isGenerating}
                 className="flex-1 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
               >
-                {isGenerating ? "Generating..." : "Generate"}
-              </button>
-
-              <button onClick={generateResume} className="btn-secondary">
-                Regenerate
+                {isGenerating ? "Generating..." : "Generate Tailored Resume"}
               </button>
 
               <button onClick={clearActiveTab} className="btn-secondary">
                 Clear
-              </button>
-
-              <button
-                onClick={deleteActiveTab}
-                className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-              >
-                Delete
               </button>
             </div>
           </div>
@@ -578,6 +575,9 @@ export default function Home() {
 
         <OutputPanel
           output={activeTab.output}
+          master_evaluation={activeTab.master_evaluation}
+          final_evaluation={activeTab.final_evaluation}
+          jdAnalysis={activeTab.jdAnalysis}
           copyText={copyText}
           formatOutput={formatOutput}
         />
@@ -589,7 +589,7 @@ export default function Home() {
           setMasterProfile={setMasterProfile}
           onClose={() => setIsDrawerOpen(false)}
           handleResumeUpload={handleResumeUpload}
-          error={error}
+          statusMessage={statusMessage}
         />
       )}
 
@@ -673,13 +673,13 @@ function MasterProfileDrawer({
   setMasterProfile,
   onClose,
   handleResumeUpload,
-  error,
+  statusMessage,
 }: {
   masterProfile: MasterProfile;
   setMasterProfile: React.Dispatch<React.SetStateAction<MasterProfile>>;
   onClose: () => void;
   handleResumeUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  error: string;
+  statusMessage: string;
 }) {
   function updateBasics(field: string, value: string) {
     setMasterProfile((prev) => ({
@@ -851,9 +851,9 @@ function MasterProfileDrawer({
             <span className="text-xs text-slate-400">PDF or DOCX</span>
           </div>
 
-          {error && (
+          {statusMessage && (
             <p className="mt-3 rounded-xl bg-white p-2 text-sm text-slate-700">
-              {error}
+              {statusMessage}
             </p>
           )}
         </div>
@@ -1314,10 +1314,16 @@ function GeneratedSectionsSummary({
 
 function OutputPanel({
   output,
+  jdAnalysis,
   copyText,
   formatOutput,
+  master_evaluation,
+  final_evaluation,
 }: {
   output: GeneratedResumeOutput | null;
+  master_evaluation?: ResumeEvaluation | null;
+  final_evaluation?: ResumeEvaluation | null;
+  jdAnalysis?: JDAnalysis | null;
   copyText: (text: string) => void;
   formatOutput: (output: GeneratedResumeOutput) => string;
 }) {
@@ -1334,6 +1340,11 @@ function OutputPanel({
 
   const skills = normalizeSkills(output.skills);
   const publications = normalizePublications(output.publications);
+
+  const highlightKeywords = [
+    ...(jdAnalysis?.keywords ?? []),
+    ...(jdAnalysis?.must_have_skills ?? []),
+  ];
 
   return (
     <section className="overflow-y-auto rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
@@ -1353,8 +1364,66 @@ function OutputPanel({
         </button>
       </div>
 
+      {master_evaluation && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-600">
+                Alignment Score (for master profile)
+              </p>
+              <h3 className="text-2xl font-bold">{master_evaluation.score}/100</h3>
+            </div>
+
+            <div className="h-3 w-40 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-violet-600"
+                style={{ width: `${Math.min(master_evaluation.score, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+            {final_evaluation && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-600">
+                Alignment Score (for final resume)
+              </p>
+              <h3 className="text-2xl font-bold">{final_evaluation.score}/100</h3>
+            </div>
+
+            <div className="h-3 w-40 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-violet-600"
+                style={{ width: `${Math.min(final_evaluation.score, 100)}%` }}
+              />
+            </div>
+          </div>
+
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <MiniList title="Strengths" items={final_evaluation.strengths} />
+            <MiniList
+              title="Missing Keywords"
+              items={final_evaluation.missing_keywords}
+            />
+            <MiniList title="Weak Points" items={final_evaluation.weak_points} />
+            <MiniList
+              title="Suggestions"
+              items={final_evaluation.improvement_suggestions}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
-        <Section title="Profile" lines={output.profile} copyText={copyText} />
+        <Section
+          title="Profile"
+          lines={output.profile}
+          copyText={copyText}
+          keywords={highlightKeywords}
+        />
 
         <Section
           title="Professional Experience"
@@ -1365,6 +1434,7 @@ function OutputPanel({
             "",
           ])}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
 
         <Section
@@ -1373,6 +1443,7 @@ function OutputPanel({
             (section) => `${section.name}: ${section.skills.join(", ")}`
           )}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
 
         <Section
@@ -1384,6 +1455,7 @@ function OutputPanel({
             "",
           ])}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
 
         <Section
@@ -1394,6 +1466,7 @@ function OutputPanel({
             "",
           ])}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
 
         <Section
@@ -1404,12 +1477,14 @@ function OutputPanel({
             "",
           ])}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
 
         <Section
           title="Languages"
           lines={[output.languages.join(" | ")]}
           copyText={copyText}
+          keywords={highlightKeywords}
         />
       </div>
     </section>
@@ -1420,10 +1495,12 @@ function Section({
   title,
   lines,
   copyText,
+  keywords = [],
 }: {
   title: string;
   lines: string[];
   copyText: (text: string) => void;
+  keywords?: string[];
 }) {
   const text = lines.filter(Boolean).join("\n");
 
@@ -1441,9 +1518,80 @@ function Section({
         </button>
       </div>
 
-      <div className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
-        {text}
+      <div className="space-y-1 text-sm leading-6 text-slate-700">
+        {lines.filter(Boolean).map((line, index) => (
+          <p key={index}>
+            <HighlightedText text={line} keywords={keywords} />
+          </p>
+        ))}
       </div>
     </section>
   );
 }
+
+function HighlightedText({
+  text,
+  keywords,
+}: {
+  text: string;
+  keywords: string[];
+}) {
+  const cleanKeywords = keywords
+    .filter((k) => k && k.length > 2)
+    .map((k) => k.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  if (cleanKeywords.length === 0) return <>{text}</>;
+
+  const regex = new RegExp(
+    `(${cleanKeywords.map((k) => escapeRegExp(k)).join("|")})`,
+    "gi"
+  );
+
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const isMatch = cleanKeywords.some(
+          (k) => k.toLowerCase() === part.toLowerCase()
+        );
+
+        return isMatch ? (
+          <strong
+            key={index}
+            className="rounded bg-yellow-100 px-1 font-semibold text-slate-950"
+          >
+            {part}
+          </strong>
+        ) : (
+          <span key={index}>{part}</span>
+        );
+      })}
+    </>
+  );
+}
+
+
+function MiniList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-xl bg-white p-3">
+      <p className="mb-2 text-xs font-bold uppercase text-slate-500">
+        {title}
+      </p>
+      {items.length === 0 ? (
+        <p className="text-xs text-slate-400">None</p>
+      ) : (
+        <ul className="space-y-1">
+          {items.slice(0, 5).map((item, index) => (
+            <li key={index} className="text-xs text-slate-700">
+              • {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+

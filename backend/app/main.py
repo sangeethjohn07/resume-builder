@@ -5,7 +5,8 @@ from app.schemas import (
     JDExtractRequest,
     JDExtractResponse,
     GenerateRequest,
-    GeneratedResumeOutput,
+    GenerateResumeResponse,
+    GeneratedResumeOutput
 )
 from app.chains.jd_extractor import extract_jd_chain
 from app.graphs.resume_graph import resume_graph
@@ -44,7 +45,7 @@ def extract_jd(request: JDExtractRequest):
     )
 
 
-@app.post("/generate", response_model=GeneratedResumeOutput)
+@app.post("/generate", response_model=GenerateResumeResponse)
 def generate_resume(request: GenerateRequest):
     result = resume_graph.invoke(
         {
@@ -54,14 +55,17 @@ def generate_resume(request: GenerateRequest):
             "additional_instructions": request.additional_instructions or "",
         }
     )
-    return result["improved_output"]
+
+    return GenerateResumeResponse(
+        output=result["improved_output"],
+        master_evaluation=result["master_evaluation"],
+        final_evaluation=result["final_evaluation"],
+        jd_analysis=result["jd_analysis"],
+    )
 
 @app.post("/parse-resume")
 async def parse_resume(file: UploadFile = File(...)):
     content = await file.read()
-
     text = extract_text(content, file.filename)
-
     parsed = parse_resume_chain(text)
-
     return parsed

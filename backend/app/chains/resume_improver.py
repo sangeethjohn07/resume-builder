@@ -55,8 +55,6 @@ Master profile:
 First generated resume:
 {generated_resume}
 
-Evaluation feedback:
-{evaluation}
             """,
         ),
     ]
@@ -69,7 +67,6 @@ def improve_resume_chain(
     additional_instructions: str,
     jd_analysis: JDExtractResponse,
     generated_resume: GeneratedResumeOutput,
-    evaluation: ResumeEvaluation,
 ) -> GeneratedResumeOutput:
     chain = prompt | structured_llm
 
@@ -80,6 +77,5 @@ def improve_resume_chain(
             "jd_analysis": jd_analysis.model_dump_json(indent=2),
             "master_profile": master_profile.model_dump_json(indent=2),
             "generated_resume": generated_resume.model_dump_json(indent=2),
-            "evaluation": evaluation.model_dump_json(indent=2),
         }
     )

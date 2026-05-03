@@ -12,6 +12,7 @@ from app.chains.jd_extractor import extract_jd_chain
 from app.chains.resume_generator import generate_resume_chain
 from app.chains.resume_evaluator import evaluate_resume_chain
 from app.chains.resume_improver import improve_resume_chain
+from app.chains.resume_evaluator_profile import evaluate_master_profile_chain
 
 
 class ResumeGraphState(TypedDict, total=False):
@@ -21,9 +22,10 @@ class ResumeGraphState(TypedDict, total=False):
     additional_instructions: str
 
     jd_analysis: JDExtractResponse
+    master_evaluation: ResumeEvaluation   
     generated_output: GeneratedResumeOutput
-    evaluation: ResumeEvaluation
     improved_output: GeneratedResumeOutput
+    final_evaluation: ResumeEvaluation   
 
 
 def extract_jd_node(state: ResumeGraphState) -> ResumeGraphState:
@@ -47,14 +49,22 @@ def generate_resume_node(state: ResumeGraphState) -> ResumeGraphState:
     return {"generated_output": generated_output}
 
 
-def evaluate_resume_node(state: ResumeGraphState) -> ResumeGraphState:
-    evaluation = evaluate_resume_chain(
+def evaluate_master_node(state: ResumeGraphState) -> ResumeGraphState:
+    master_evaluation = evaluate_master_profile_chain(
+        master_profile=state["master_profile"],
+        jd_analysis=state["jd_analysis"],
+        target_role=state["target_role"],
+    )
+    return {"master_evaluation": master_evaluation}
+
+
+def evaluate_final_node(state: ResumeGraphState) -> ResumeGraphState:
+    final_evaluation = evaluate_resume_chain(
         target_role=state["target_role"],
         jd_analysis=state["jd_analysis"],
-        generated_resume=state["generated_output"],
+        generated_resume=state["improved_output"],
     )
-
-    return {"evaluation": evaluation}
+    return {"final_evaluation": final_evaluation}
 
 
 def improve_resume_node(state: ResumeGraphState) -> ResumeGraphState:
@@ -64,7 +74,6 @@ def improve_resume_node(state: ResumeGraphState) -> ResumeGraphState:
         additional_instructions=state.get("additional_instructions", ""),
         jd_analysis=state["jd_analysis"],
         generated_resume=state["generated_output"],
-        evaluation=state["evaluation"],
     )
 
     return {"improved_output": improved_output}
@@ -72,19 +81,20 @@ def improve_resume_node(state: ResumeGraphState) -> ResumeGraphState:
 
 def build_resume_graph():
     graph = StateGraph(ResumeGraphState)
-
+    
     graph.add_node("extract_jd", extract_jd_node)
+    graph.add_node("evaluate_master", evaluate_master_node)
     graph.add_node("generate_resume", generate_resume_node)
-    graph.add_node("evaluate_resume", evaluate_resume_node)
     graph.add_node("improve_resume", improve_resume_node)
+    graph.add_node("evaluate_final", evaluate_final_node)
 
     graph.set_entry_point("extract_jd")
 
-    graph.add_edge("extract_jd", "generate_resume")
-    graph.add_edge("generate_resume", "evaluate_resume")
-    graph.add_edge("evaluate_resume", "improve_resume")
-    graph.add_edge("improve_resume", END)
-
+    graph.add_edge("extract_jd", "evaluate_master")
+    graph.add_edge("evaluate_master", "generate_resume")
+    graph.add_edge("generate_resume", "improve_resume")
+    graph.add_edge("improve_resume", "evaluate_final")
+    graph.add_edge("evaluate_final", END)
     return graph.compile()
 
 
