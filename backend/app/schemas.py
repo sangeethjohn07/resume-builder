@@ -117,3 +117,10 @@ class GeneratedResumeOutput(BaseModel):
     projects: List[GeneratedProjectItem]
     publications: List[GeneratedPublicationItem]
     languages: List[str]
+    
+class ResumeEvaluation(BaseModel):
+    score: int
+    strengths: List[str]
+    missing_keywords: List[str]
+    weak_points: List[str]
+    improvement_suggestions: List[str]
