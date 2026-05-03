@@ -124,3 +124,17 @@ class ResumeEvaluation(BaseModel):
     missing_keywords: List[str]
     weak_points: List[str]
     improvement_suggestions: List[str]
+    
+
+class GenerateResumeResponse(BaseModel):
+    output: GeneratedResumeOutput
+    master_evaluation: ResumeEvaluation
+    final_evaluation: ResumeEvaluation
+    jd_analysis: JDExtractResponse
+
+
+class GenerateRequest(BaseModel):
+    master_profile: MasterProfile
+    jd_text: str
+    target_role: str
+    additional_instructions: Optional[str] = None

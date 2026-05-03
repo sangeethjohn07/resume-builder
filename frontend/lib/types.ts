@@ -77,4 +77,31 @@ export type ApplicationTab = {
   jdText: string;
   additionalInstructions: string;
   output: GeneratedResumeOutput | null;
+  master_evaluation?: ResumeEvaluation | null;
+  final_evaluation?: ResumeEvaluation | null;
+  jdAnalysis?: JDAnalysis | null;
+};
+
+export type ResumeEvaluation = {
+  score: number;
+  strengths: string[];
+  missing_keywords: string[];
+  weak_points: string[];
+  improvement_suggestions: string[];
+};
+
+export type JDAnalysis = {
+  role_title: string;
+  keywords: string[];
+  must_have_skills: string[];
+  responsibilities: string[];
+  seniority?: string;
+  domain?: string;
+};
+
+export type GenerateResumeResponse = {
+  output: GeneratedResumeOutput;
+  master_evaluation: ResumeEvaluation;
+  final_evaluation: ResumeEvaluation;
+  jd_analysis: JDAnalysis;
 };
