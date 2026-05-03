@@ -1,10 +1,11 @@
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from langgraph.graph import StateGraph, END
 
 from app.schemas import MasterProfile, JDExtractResponse, GeneratedResumeOutput
 from app.chains.jd_extractor import extract_jd_chain
 from app.chains.resume_generator import generate_resume_chain
+
 
 class ResumeGraphState(TypedDict, total=False):
     master_profile: MasterProfile
@@ -13,7 +14,8 @@ class ResumeGraphState(TypedDict, total=False):
     additional_instructions: str
     jd_analysis: JDExtractResponse
     generated_output: GeneratedResumeOutput
-    
+
+
 def extract_jd_node(state: ResumeGraphState) -> ResumeGraphState:
     jd_analysis = extract_jd_chain(
         jd_text=state["jd_text"],
@@ -26,7 +28,7 @@ def extract_jd_node(state: ResumeGraphState) -> ResumeGraphState:
 def generate_resume_node(state: ResumeGraphState) -> ResumeGraphState:
     generated_output = generate_resume_chain(
         master_profile=state["master_profile"],
-        jd_text=state["jd_text"],
+        jd_analysis=state["jd_analysis"],
         target_role=state["target_role"],
         additional_instructions=state.get("additional_instructions"),
     )
